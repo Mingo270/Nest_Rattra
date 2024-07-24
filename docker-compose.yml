@@ -15,5 +15,21 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
+  nestjs-app:
+    container_name: nestjs-app
+    build: .
+    ports:
+      - '3000:3000'
+    environment:
+      DATABASE_HOST: postgres
+      DATABASE_PORT: 5432
+      DATABASE_USER: postgres
+      DATABASE_PASSWORD: postgres
+      DATABASE_NAME: nestjs-rattrapage
+    depends_on:
+      - postgres
+    volumes:
+      - .:/usr/src/app
+
 volumes:
   postgres_data:
