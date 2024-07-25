@@ -23,7 +23,9 @@
         "types": ["node"]
     },
     "include": [
-        "src/**/*.ts"
+        "src/**/*.ts",
+        "node_modules/@types/node/globals.d.ts",
+        "node_modules/@types/node/globals.d.ts"
     ],
     "exclude": [
         "node_modules",

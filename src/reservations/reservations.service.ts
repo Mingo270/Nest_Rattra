@@ -1,98 +1,105 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Reservation } from './entities/reservation.entity';
+import { CreateReservationDto } from './dto/create-reservation.dto';
 import { Restaurant } from './entities/restaurant.entity';
 import { Client } from './entities/client.entity';
-import { CreateReservationDto } from './dto/create-reservation.dto';
+import { CustomLogger } from '../winston-logger';
 
 @Injectable()
 export class ReservationsService {
     constructor(
         @InjectRepository(Reservation)
-        private reservationsRepository: Repository<Reservation>,
+        private readonly reservationsRepository: Repository<Reservation>,
         @InjectRepository(Restaurant)
-        private restaurantsRepository: Repository<Restaurant>,
+        private readonly restaurantsRepository: Repository<Restaurant>,
         @InjectRepository(Client)
-        private clientsRepository: Repository<Client>,
+        private readonly clientsRepository: Repository<Client>,
     ) {}
 
     async create(createReservationDto: CreateReservationDto): Promise<Reservation> {
-        const restaurant = await this.restaurantsRepository.findOne({ where: { id: createReservationDto.restaurantId } });
-        const client = await this.clientsRepository.findOne({ where: { id: createReservationDto.clientId } });
+        const { clientId, restaurantId, date, seats } = createReservationDto;
+
+        CustomLogger.info(`Creating reservation: clientId=${clientId}, restaurantId=${restaurantId}, date=${date}, seats=${seats}`);
+
+        const client = await this.clientsRepository.findOne({ where: { id: clientId } });
+        const restaurant = await this.restaurantsRepository.findOne({ where: { id: restaurantId } });
 
         if (!restaurant || !client) {
-            throw new Error('Invalid restaurant or client ID');
+            CustomLogger.error(`Invalid restaurant or client ID: restaurantId=${restaurantId}, clientId=${clientId}`);
+            throw new NotFoundException('Invalid restaurant or client ID');
         }
 
-        const availableSeats = await this.getAvailableSeats(restaurant.id, createReservationDto.date);
-        if (availableSeats < createReservationDto.numberOfPeople) {
-            throw new Error('Not enough available seats');
-        }
-
-        const reservation = new Reservation();
-        reservation.date = createReservationDto.date;
-        reservation.numberOfPeople = createReservationDto.numberOfPeople;
-        reservation.restaurant = restaurant;
-        reservation.client = client;
-
-        return this.reservationsRepository.save(reservation);
+        const reservation = this.reservationsRepository.create({ client, restaurant, date, seats });
+        await this.reservationsRepository.save(reservation);
+        CustomLogger.info(`Reservation created successfully: ${JSON.stringify(reservation)}`);
+        return reservation;
     }
 
     async cancel(id: number): Promise<void> {
-        const reservation = await this.reservationsRepository.findOne({ where: { id } });
-        if (!reservation) {
-            throw new Error('Reservation not found');
+        CustomLogger.info(`Cancelling reservation with ID: ${id}`);
+
+        const result = await this.reservationsRepository.delete(id);
+        if (result.affected === 0) {
+            CustomLogger.error(`Reservation with ID ${id} not found for cancellation.`);
+            throw new NotFoundException(`Reservation with ID ${id} not found.`);
         }
 
-        const currentDate = new Date();
-        if (reservation.date < currentDate) {
-            throw new Error('Cannot cancel past reservations');
-        }
-
-        await this.reservationsRepository.delete(id);
+        CustomLogger.info(`Reservation with ID ${id} cancelled successfully.`);
     }
 
     async findAllByClient(clientId: number): Promise<Reservation[]> {
-        console.log('Finding reservations for client ID:', clientId);
+        CustomLogger.info(`Finding reservations for client ID: ${clientId}`);
 
-        return this.reservationsRepository.find({
+        const reservations = await this.reservationsRepository.find({
             where: { id: clientId },
             relations: ['restaurant'],
-        }).then(reservations => {
-            console.log('Found reservations:', reservations);
-            return reservations;
         });
+
+        if (reservations.length === 0) {
+            CustomLogger.info(`No reservations found for client ID: ${clientId}`);
+        } else {
+            CustomLogger.info(`Found reservations for client ID ${clientId}: ${JSON.stringify(reservations)}`);
+        }
+
+        return reservations;
     }
 
     async findAllByRestaurant(restaurantId: number): Promise<Reservation[]> {
-        console.log('Finding reservations for restaurant ID:', restaurantId);
+        CustomLogger.info(`Finding reservations for restaurant ID: ${restaurantId}`);
 
         const reservations = await this.reservationsRepository.find({
             where: { id: restaurantId },
             relations: ['client'],
         });
-        console.log('Found reservations:', reservations);
+
+        if (reservations.length === 0) {
+            CustomLogger.info(`No reservations found for restaurant ID: ${restaurantId}`);
+        } else {
+            CustomLogger.info(`Found reservations for restaurant ID ${restaurantId}: ${JSON.stringify(reservations)}`);
+        }
 
         return reservations;
     }
 
-
     async getAvailableSeats(restaurantId: number, date: Date): Promise<number> {
-        const restaurant = await this.restaurantsRepository.findOne({
-            where: { id: restaurantId },
-            relations: ['reservations'],
-        });
+        CustomLogger.info(`Calculating available seats for restaurant ID ${restaurantId} on date ${date}`);
+
+        const restaurant = await this.restaurantsRepository.findOne({ where: { id: restaurantId } });
         if (!restaurant) {
-            throw new Error('Restaurant not found');
+            CustomLogger.error(`Restaurant with ID ${restaurantId} not found.`);
+            throw new NotFoundException(`Restaurant with ID ${restaurantId} not found.`);
         }
-        const reservations = restaurant.reservations.filter(
-            (reservation) => reservation.date.toDateString() === date.toDateString(),
-        );
-        const reservedSeats = reservations.reduce(
-            (sum, reservation) => sum + reservation.numberOfPeople,
-            0,
-        );
-        return restaurant.totalSeats - reservedSeats;
+
+        const reservations = await this.reservationsRepository.find({
+            where: { id: restaurantId, date: date },
+        });
+
+        const totalSeatsReserved = reservations.reduce((total, reservation) => total + reservation.seats, 0);
+        const availableSeats = restaurant.totalSeats - totalSeatsReserved;
+
+        CustomLogger.info(`Available seats for restaurant ID ${restaurantId} on date ${date}: ${availableSeats}`);
+        return availableSeats;
     }
 }

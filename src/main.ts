@@ -4,7 +4,7 @@ import { CustomConsoleLogger } from './custom-console-logger'; // Importer le lo
 
 async function bootstrap() {
     const app = await NestFactory.create(AppModule, {
-        logger: new CustomConsoleLogger(), // Utiliser le logger personnalisé
+        logger: new CustomConsoleLogger(),
     });
     await app.listen(3000);
 }
