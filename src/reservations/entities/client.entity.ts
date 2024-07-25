@@ -1,5 +1,10 @@
 import { Entity, PrimaryGeneratedColumn, Column, OneToMany } from 'typeorm';
 import { Reservation } from './reservation.entity';
+import { CustomLogger} from "../../winston-logger";
+
+CustomLogger.info('This is an info message');
+CustomLogger.error('This is an error message');
+
 
 @Entity()
 export class Client {
@@ -7,10 +12,7 @@ export class Client {
     id: number;
 
     @Column()
-    firstName: string;
-
-    @Column()
-    lastName: string;
+    name: string;
 
     @OneToMany(() => Reservation, reservation => reservation.client)
     reservations: Reservation[];

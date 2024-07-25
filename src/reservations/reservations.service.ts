@@ -54,28 +54,45 @@ export class ReservationsService {
     }
 
     async findAllByClient(clientId: number): Promise<Reservation[]> {
+        console.log('Finding reservations for client ID:', clientId);
+
         return this.reservationsRepository.find({
-            where: {
-                client: { id: clientId },
-            },
+            where: { id: clientId },
             relations: ['restaurant'],
+        }).then(reservations => {
+            console.log('Found reservations:', reservations);
+            return reservations;
         });
     }
 
     async findAllByRestaurant(restaurantId: number): Promise<Reservation[]> {
-        return this.reservationsRepository.find({
-            where: { restaurant: { id: restaurantId } }, // Corrected property name
+        console.log('Finding reservations for restaurant ID:', restaurantId);
+
+        const reservations = await this.reservationsRepository.find({
+            where: { id: restaurantId },
             relations: ['client'],
         });
+        console.log('Found reservations:', reservations);
+
+        return reservations;
     }
+
 
     async getAvailableSeats(restaurantId: number, date: Date): Promise<number> {
         const restaurant = await this.restaurantsRepository.findOne({
             where: { id: restaurantId },
             relations: ['reservations'],
         });
-        const reservations = restaurant.reservations.filter(reservation => reservation.date.toDateString() === date.toDateString());
-        const reservedSeats = reservations.reduce((sum, reservation) => sum + reservation.numberOfPeople, 0);
+        if (!restaurant) {
+            throw new Error('Restaurant not found');
+        }
+        const reservations = restaurant.reservations.filter(
+            (reservation) => reservation.date.toDateString() === date.toDateString(),
+        );
+        const reservedSeats = reservations.reduce(
+            (sum, reservation) => sum + reservation.numberOfPeople,
+            0,
+        );
         return restaurant.totalSeats - reservedSeats;
     }
 }

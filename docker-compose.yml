@@ -1,22 +1,18 @@
-version: '3.8'
-
-name: 'nestjs-rattrapage'
+version: '3.9'
 
 services:
   postgres:
-    container_name: postgres
     image: postgres:latest
     ports:
-      - '${DATABASE_PORT}:5432'
+      - '5432:5432'
     environment:
-      POSTGRES_DB: nestjs-rattrapage
+      POSTGRES_DB: nestjs_rattrapage
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
   nestjs-app:
-    container_name: nestjs-app
     build: .
     ports:
       - '3000:3000'
@@ -25,11 +21,9 @@ services:
       DATABASE_PORT: 5432
       DATABASE_USER: postgres
       DATABASE_PASSWORD: postgres
-      DATABASE_NAME: nestjs-rattrapage
+      DATABASE_NAME: nestjs_rattrapage
     depends_on:
       - postgres
-    volumes:
-      - .:/usr/src/app
 
 volumes:
   postgres_data:

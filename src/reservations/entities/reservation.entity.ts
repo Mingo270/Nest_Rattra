@@ -1,6 +1,11 @@
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne } from 'typeorm';
-import { Restaurant } from './restaurant.entity';
 import { Client } from './client.entity';
+import { Restaurant } from './restaurant.entity';
+import { CustomLogger} from "../../winston-logger";
+
+CustomLogger.info('This is an info message');
+CustomLogger.error('This is an error message');
+
 
 @Entity()
 export class Reservation {
